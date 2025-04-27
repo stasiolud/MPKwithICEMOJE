@@ -5,7 +5,7 @@
 #ifndef PASSENGERIMPL_H
 #define PASSENGERIMPL_H
 #include <Ice/Ice.h>
-#include "SIP.h"
+#include "../SIP.h"
 #include <string>
 #include <vector>
 #include <mutex>

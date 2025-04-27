@@ -5,7 +5,7 @@
 #ifndef TRAMIMPL_H
 #define TRAMIMPL_H
 #include <Ice/Ice.h>
-#include "SIP.h"
+#include "../SIP.h"
 #include <string>
 #include <vector>
 #include <thread>

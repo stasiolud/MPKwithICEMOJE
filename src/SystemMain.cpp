@@ -2,7 +2,7 @@
 // Created by szymo on 27.04.2025.
 //
 // SystemMain.cpp
-#include "../MPKImpl.h"
+#include "MPKImpl.h"
 #include <iostream>
 
 class MPKServer : public Ice::Application {

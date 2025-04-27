@@ -6,7 +6,7 @@
 #define MPKIMPL_H
 
 #include <Ice/Ice.h>
-#include "SIP.h"
+#include "../SIP.h"
 #include <map>
 #include <vector>
 #include <string>

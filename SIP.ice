@@ -43,7 +43,7 @@ module SIP {
      void RegisterPassenger(Passenger* p);
      void UnregisterPassenger(Passenger* p);
      void UpdateTramInfo(Tram* tram, Time time);
-  }
+  };
 
   interface Line {
 		TramList getTrams();
