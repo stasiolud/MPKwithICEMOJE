@@ -7,3 +7,4 @@ tram.o
 mpk.cpp
 mpk.o
 mpk.h
+editor.xml

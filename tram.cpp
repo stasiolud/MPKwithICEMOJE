@@ -1,0 +1,290 @@
+#include <Ice/Ice.h>
+#include "MPK.h"
+#include <iostream>
+#include <memory>
+#include <fstream>
+#include <string>
+
+using namespace std;
+using namespace SIP;
+
+class TramI:public SIP::Tram {
+    private:
+        string stockNumber;
+        shared_ptr<TramStopPrx> currentStop;
+        StopList stopList;
+        vector <shared_ptr<PassengerPrx>> passengers;
+        shared_ptr<LinePrx> line;
+
+    public:
+        TramI(string stockNumber){
+            this->stockNumber = stockNumber;
+        };
+
+        void addStop(const struct StopInfo stopInfo){
+            stopList.push_back(stopInfo);
+        };
+
+        void setNextStop(){
+            if(line){
+                for(int i = 0; i < line->getStops().size(); ++i){
+                    if(this->currentStop->getName() == line->getStops().at(i).stop->getName()){
+                        if(i + 1 < line->getStops().size()){
+                            this->currentStop = line->getStops().at(i + 1).stop;
+                            return;
+                        }
+                        else if(i + 1 == line->getStops().size()){
+                            this->currentStop = this->line->getStops().at(0).stop;
+                        }
+                    }
+                }
+            }
+        }
+
+        void setLine(shared_ptr<LinePrx> line, const Ice::Current& current) override {
+            this->line = line;
+            this->currentStop = this->line->getStops().at(0).stop;
+        }
+
+        shared_ptr<LinePrx> getLine(const Ice::Current& current) override{
+            return line;
+        }
+
+        shared_ptr<TramStopPrx> getLocation(const Ice::Current& current) override{
+            return currentStop;
+        };
+
+        int getNextStopIndex(StopList allStops){
+            for(int i = 0; i < allStops.size(); i++){
+                if(allStops.at(i).stop->getName() == currentStop->getName()){
+                    if(i + 1 < allStops.size()){
+                        return i + 1;
+                    }
+                    else{
+                        return -1;
+                    }
+                }
+            }
+            return -1;
+        };
+
+        StopList getNextStops(int howMany, const Ice::Current& current) override{
+            StopList nextStops;
+
+            StopList allStops = line->getStops();
+            int stopIndex = getNextStopIndex(allStops);
+
+            if(stopIndex != -1){
+                for(int i = stopIndex; i < stopIndex + howMany; ++i){
+                    if(i < allStops.size()){
+                        nextStops.push_back(allStops.at(i));
+                    }
+                }
+                for(int i = stopIndex - 2; i >= 0; --i){
+                    if(nextStops.size() < howMany){
+                        nextStops.push_back(allStops.at(i));
+                    }
+                }
+            }
+            else{
+                for(int i = 0; i < allStops.size() - 1; ++i){
+                    if(nextStops.size() < howMany){
+                        nextStops.push_back(allStops.at(i));
+                    }
+                }
+            }
+
+            return nextStops;
+        }
+
+        void informPassenger(shared_ptr<TramPrx> tram, StopList stops){
+            for(int i = 0; i < passengers.size(); ++i){
+                passengers.at(i)->updateTramInfo(tram, stops);
+            }
+        }
+
+        void RegisterPassenger(shared_ptr<PassengerPrx> passenger, const Ice::Current& current) override{
+            cout << "Uzytkownik subskrybuje" << endl;
+            passengers.push_back(passenger);
+        };
+
+        void UnregisterPassenger(shared_ptr<PassengerPrx> passenger, const Ice::Current& current) override{
+            for(int index=0; index < passengers.size(); index++){
+                if(passengers.at(index)->ice_getIdentity() == passenger->ice_getIdentity()){
+                    cout << "Uzytkownik zakonczyl subskrypcje" << endl;
+                    passengers.erase(passengers.begin() + index);
+                    break;
+                }
+            }
+        };
+
+        string getStockNumber(const Ice::Current& current) override {
+            return stockNumber;
+        }
+};
+
+int getIdLine(LineList lines, string name){
+    for(int i = 0; i < lines.size(); ++i){
+        if(lines.at(i)->getName() == name){
+            return i;
+        }
+    }
+    return -1;
+}
+
+bool checkName(string line_name, LineList lines){
+    for(int i = 0; i < lines.size(); ++i){
+        if(line_name == lines.at(i)->getName()){
+            return true;
+        }
+    }
+    return false;
+}
+
+int main (int argc, char *argv[])
+{
+    string address = "127.0.0.1";
+    string port = "10000";
+    string name = "mpk";
+
+//    cout << "Podaj adres SIP-u: ";
+//    cin >> address;
+//    cout << endl;
+//
+//    cout << "Podaj port SIP-u: ";
+//    cin >> port;
+//    cout << endl;
+//
+//    cout << "Podaj nazwę SIP-u: ";
+//    cin >> name;
+//    cout << endl;
+
+    Ice::CommunicatorPtr ic;
+    try{
+        //uzyskuje dostep do obiektu sip
+        ic = Ice::initialize(argc, argv);
+        auto base = ic->stringToProxy (name+":default -h " + address + " -p " + port + " -t 8000");
+        auto mpk = Ice::checkedCast<MPKPrx>(base);
+        if (!mpk){
+            throw "Invalid proxy";
+        }
+
+        //pobieram dostepne linie
+        LineList lines = mpk->getLines();
+
+        //wyswietlam info o dostepnych liniach
+        cout << "Dostepne linie: " << endl << endl;
+        for(int index = 0; index < lines.size(); ++index){
+            cout << "Linia nr: " << lines.at(index)->getName() << endl << "\tPrzystanki: " << endl;
+            StopList tramStops = lines.at(index)->getStops();
+            for(int stopIndex = 0; stopIndex < tramStops.size(); stopIndex++){
+                cout << "\t\t" << tramStops.at(stopIndex).stop->getName() << endl;
+            }
+            cout << endl << endl;
+        }
+
+        //tworze obiekt ice
+        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints ("TramAdapter", "default -p 10009");
+
+        //pobieram numer tramwaju
+        string tramStockNumber;
+        cout << "Wprowadź swój numer tramwaju: ";
+        cin >> tramStockNumber;
+        std::cin.clear();
+        cout << endl;
+
+        //tworze servant tramwaju
+        auto tram = make_shared<TramI>(tramStockNumber);
+        auto tramPrx = Ice::uncheckedCast<TramPrx>(adapter->addWithUUID(tram));
+        adapter->add(tram, Ice::stringToIdentity("tram1"));
+
+        //wybieram do ktorej lini dolaczam
+        string line_name;
+        cout << "Wybierz linie, wpisujac nazwe: ";
+        cin >> line_name;
+
+        while(!checkName(line_name, lines)){
+            cout << "Niewlasciwa linia, wybierz ponownie: " << endl;
+            cin >> line_name;
+        }
+
+        std::cin.clear();
+
+        //ustawienie czasu dotarcia na przystanki
+        time_t currentTime;
+        time(&currentTime);
+        tm *timeNow = localtime(&currentTime);
+
+        int ID = getIdLine(lines, line_name);
+
+        shared_ptr<LinePrx> linePrx = lines.at(ID);
+        tram->setLine(linePrx, Ice::Current());
+
+        StopList tramStops = linePrx->getStops();
+        int hour = timeNow->tm_hour;
+        int minute = timeNow->tm_min;
+        int interval = 5;
+
+        for(int index=0; index < tramStops.size(); index++){
+            Time timeOfDay;
+            timeOfDay.hour = hour;
+            timeOfDay.minute = minute;
+
+
+            //tramStops.at(index).time = timeOfDay;
+            StopInfo stopInfo;
+            stopInfo.time = timeOfDay;
+            shared_ptr<TramStopPrx> tramStopPrx = tramStops.at(index).stop;
+            stopInfo.stop = tramStopPrx;
+
+            tram->addStop(stopInfo);
+            tramStops.at(index).stop->UpdateTramInfo(tramPrx, timeOfDay);
+
+            minute += interval;
+            if(minute >= 60){
+                hour++;
+                minute = minute - 60;
+            }
+        }
+
+        //tram->setNextStop();
+
+        //dolaczanie do linii
+        adapter->activate();
+        linePrx->registerTram(tramPrx);
+        mpk->getDepo("Zajezdnia1")->TramOnline(tramPrx);
+
+        char sign;
+        cout << "Znak 'q' konczy program. Znak 'n' oznacza dotarcie do kolejnego przystanku" << endl;
+        while(true){
+            cin >> sign;
+            if(sign == 'q'){
+                //tram->unregisterAllUser(tramPrx);
+                break;
+            }
+            if(sign == 'n'){
+                tram->setNextStop();
+                cout << "Dotarleś do kolejnego przystanku: " << tramPrx->getLocation()->getName() << endl;
+                //tram->informAllUser(tramPrx);
+            }
+        }
+
+        linePrx->unregisterTram(tramPrx);
+        mpk->getDepo("Zajezdnia1")->TramOffline(tramPrx);
+
+        }catch(const Ice::Exception & e){
+            cout << e << endl;
+        }catch(const char *msg){
+            cout << msg << endl;
+        }
+
+        if(ic){
+            try{
+                ic->destroy();
+            }catch(const Ice::Exception & e){
+                cout << e << endl;
+            }
+        }
+
+        cout << "Koniec programu tramwaj" << endl;
+}
