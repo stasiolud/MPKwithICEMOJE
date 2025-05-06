@@ -5,9 +5,7 @@
 using namespace std;
 using namespace SIP;
 
-TramStopI::TramStopI(string name) {
-    this->name = name;
-}
+TramStopI::TramStopI(string name) : name(name) {}
 
 void TramStopI::addLine(shared_ptr <LinePrx> line) {
     lines.push_back(line);

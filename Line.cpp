@@ -4,9 +4,7 @@
 using namespace std;
 using namespace SIP;
 
-LineI::LineI(string name) {
-    this->name = name;
-}
+LineI::LineI(string name) : name(name) {}
 
 TramList LineI::getTrams(const Ice::Current &current) {
     return all_trams;

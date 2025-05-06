@@ -4,9 +4,7 @@
 using namespace std;
 using namespace SIP;
 
-DepoI::DepoI(string name) {
-    this->name = name;
-}
+DepoI::DepoI(string name) : name(name) {}
 
 void DepoI::TramOnline(shared_ptr <TramPrx> tram, const Ice::Current &current) {
     if (tram) {
