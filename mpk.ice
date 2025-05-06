@@ -4,7 +4,13 @@ module SIP {
   interface TramStop;
   interface Depo;
   interface Passenger;
-
+  enum TramStatus
+  {
+    ONLINE,
+    OFFLINE,
+    WAITONLINE,
+    WAITOFFLINE,
+  }
   struct Time {
     int hour;
     int minute;
@@ -92,8 +98,8 @@ module SIP {
     void RegisterPassenger(Passenger* p);
     void UnregisterPassenger(Passenger* p);
     string getStockNumber();
-    bool isOnline();
-    bool setOnline(bool online);
+    TramStatus getStatus();
+    void setStatus(TramStatus status);
   };
 
   interface Passenger{

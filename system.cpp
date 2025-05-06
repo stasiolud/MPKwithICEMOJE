@@ -242,7 +242,8 @@ class LineI:public SIP::Line{
         void unregisterTram(::std::shared_ptr<TramPrx> tram, const Ice::Current& current) override{
             for(int i = 0; i < all_trams.size(); ++i){
                 if(all_trams.at(i).tram->getStockNumber() == tram->getStockNumber()){
-                    cout << "Usuwam tramwaj o numerze: " << tram->getStockNumber() << endl;
+                    cout << "Zjezdza z lini tramwaj o numerze: " << tram->getStockNumber() << endl;
+                    cout << "Oczekiwanie na offline" << tram->getStockNumber() << endl;
                     all_trams.erase(all_trams.begin() + i);
                     break;
                 }
@@ -265,6 +266,7 @@ class DepoI:public SIP::Depo{
         }
         void TramOnline(::std::shared_ptr<TramPrx> tram, const Ice::Current& current) override{
             if(tram){
+                tram->setStatus(SIP::TramStatus::ONLINE, Ice::Context());
                 cout << "Tramwaj " << tram->getStockNumber() << " wyjechal z zajezdni" << endl;
             }
             else{
@@ -273,6 +275,7 @@ class DepoI:public SIP::Depo{
         }
         void TramOffline(::std::shared_ptr<TramPrx> tram, const Ice::Current& current) override{
             if(tram){
+                tram->setStatus(SIP::TramStatus::OFFLINE, Ice::Context());
                 cout << "Tramwaj " << tram->getStockNumber() << " zjechal do zajezdni" << endl;
             }
             else{
@@ -285,10 +288,14 @@ class DepoI:public SIP::Depo{
         void registerTram(::std::shared_ptr<TramPrx> tram, const Ice::Current& current) override{
             TramInfo tramInfo;
             tramInfo.tram = tram;
+            tramInfo.tram->setStatus(SIP::TramStatus::WAITONLINE, Ice::Context());
             all_trams.push_back(tramInfo);
             cout << "Zajezdnia zarejestrowala tramwaj o numerze: " << tram->getStockNumber() << endl;
         };
         void unregisterTram(::std::shared_ptr<TramPrx> tram, const Ice::Current& current) override{
+            TramInfo tramInfo;
+            tramInfo.tram = tram;
+            tramInfo.tram->setStatus(SIP::TramStatus::WAITOFFLINE, Ice::Context());
         };
         TramList getTrams(const Ice::Current& current) override{
             return all_trams;
@@ -469,8 +476,8 @@ int main (int argc, char *argv[]){
         }
         //aktywuje nasluchiwanie
         adapter->activate();
-        while(true){
-            cout<< "Kliknij d - aby wyswietlic depo" << endl;
+         while(true){
+            cout << "Kliknij d - aby wyswietlic depo" << endl;
             char sign;
             cin >> sign;
             if(sign == 'd'){
@@ -482,26 +489,57 @@ int main (int argc, char *argv[]){
                 cout << "Zarejestrowane tramwaje: " << endl;
                 TramList tramList = depoPrx->getTrams(Ice::Context());
                 for(int i = 0; i < tramList.size(); ++i){
-                    cout << i << ". "<<"\t" << tramList.at(i).tram->getStockNumber()<< " - "
-                         << ((tramList.at(i).tram->isOnline()) ? " jezdzi" : " waiting for accept from system")
-                         << endl;
+                    cout << i << ". " << tramList.at(i).tram->getStockNumber() << " - ";
+                    if(tramList.at(i).tram->getStatus(Ice::Context()) == SIP::TramStatus::ONLINE){
+                        cout << "driving" << endl;
+                    }else if(tramList.at(i).tram->getStatus(Ice::Context()) == SIP::TramStatus::OFFLINE){
+                        cout << "offline" << endl;
+                    }
+                    else if(tramList.at(i).tram->getStatus(Ice::Context()) == SIP::TramStatus::WAITONLINE){
+                        cout << "waiting to online" << endl;
+                    }
+                    else if(tramList.at(i).tram->getStatus(Ice::Context()) == SIP::TramStatus::WAITOFFLINE){
+                        cout << "waiting to offline" << endl;
+                    }
+                    else{
+                        cout << "unknown" << endl;
+                    }
                 }
-                cout<< "Click 'q' to exit from depo, Pick number to make it online" << endl;
-                int number;
-                cin >> number;
-                if(number<0 || number >= tramList.size()){
+                cout << "Wpisz '<numer> ONLINE' lub '<numer> OFFLINE', lub 'q' aby wyjsc z depo: " << endl;
+                string command;
+                cin.ignore(); // czyści bufor po wcześniejszym cin >> sign
+                getline(cin, command);
+        
+                if(command == "q"){
                     cout << "Zajezdnia zamyka sie" << endl;
                     break;
                 }
-                else{
+        
+                istringstream iss(command);
+                int number;
+                string action;
+                iss >> number >> action;
+        
+                if(number < 0 || number >= tramList.size()){
+                    cout << "Nieprawidlowy numer tramwaju." << endl;
+                } else if(action == "ONLINE"){
                     shared_ptr<TramPrx> tram = tramList.at(number).tram;
-                    if(tram->isOnline()){
-                        cout << "Tramwaj jest online" << endl;
-                    }else{
-                        tram->setOnline(true);
+                    if(tram->getStatus(Ice::Context()) == SIP::TramStatus::ONLINE){
+                        cout << "Tramwaj jest juz online" << endl;
+                    } else {
                         depoPrx->TramOnline(tram, Ice::Context());
                         cout << "Tramwaj " << tram->getStockNumber() << " jest online" << endl;
                     }
+                } else if(action == "OFFLINE"){
+                    shared_ptr<TramPrx> tram = tramList.at(number).tram;
+                    if(tram->getStatus(Ice::Context()) == SIP::TramStatus::OFFLINE){
+                        cout << "Tramwaj jest juz offline" << endl;
+                    } else {
+                        depoPrx->TramOffline(tram, Ice::Context());
+                        cout << "Tramwaj " << tram->getStockNumber() << " jest offline" << endl;
+                    }
+                } else {
+                    cout << "Nieznana komenda." << endl;
                 }
             }
             sleep(1);
