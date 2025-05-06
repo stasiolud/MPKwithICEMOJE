@@ -163,6 +163,8 @@ public:
     void RegisterPassenger(::std::shared_ptr <PassengerPrx> passenger, const Ice::Current &current) override {
         passengers.push_back(passenger);
         cout << "Pasazer zasubskrybowal przystanek: " << name << endl;
+        cout << "Przystanek: " << this->name << endl;
+        cout << "Liczba zasubskrybowanych pasażerów: " << passengers.size() << endl;
 //            for(int lineIndex = 0; lineIndex < lines.size(); lineIndex++){
 //                shared_ptr<LinePrx> line = lines.at(lineIndex);
 //                TramList trams = line->getTrams();
@@ -215,12 +217,17 @@ public:
         tramInfo.tram = tram;
         currentTrams.push_back(tramInfo);
         string header = "Tramwaje na przystanku " + name;
+        cout << header << endl;
+        cout << "Liczba zasubskrybowanych pasażerów: " << passengers.size() << endl;
         for (const auto &passenger: passengers) {
+            cout << "pass1" << endl;
             passenger->notifyPassenger(header, Ice::Context());
         }
         for (auto it = currentTrams.begin(); it != currentTrams.end(); ++it) {
-            string info = it->tram->getStockNumber();
+            string info = "Tramwaj: " + it->tram->getStockNumber();
+            cout << info << endl;
             for (const auto &passenger: passengers) {
+                cout << "pass1" << endl;
                 passenger->notifyPassenger(info, Ice::Context());
             }
 
@@ -482,7 +489,11 @@ int main(int argc, char *argv[]) {
 
             StopList stopList;
             while (iss >> stop_name) {
-                auto tramStopPrx = stopFactory->createStop(stop_name, Ice::Current());
+                auto tramStopPrx = mpk->getTramStop(stop_name, Ice::Current());
+                if (!tramStopPrx) {
+                    tramStopPrx = stopFactory->createStop(stop_name, Ice::Current());
+                    mpk->addStop(tramStopPrx);
+                }
                 StopInfo stopInfo;
                 stopInfo.time.hour = timeNow->tm_hour;
                 stopInfo.time.minute = timeNow->tm_min;

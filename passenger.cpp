@@ -171,12 +171,28 @@ int main(int argc, char *argv[]) {
         cout << endl;
         cout << "Dostępne przystanki: " << endl;
         for (int stopIndex = 0; stopIndex < allStops.size(); stopIndex++) {
-            shared_ptr <TramStopPrx> tramStop = allStops.at(stopIndex).stop;
+            shared_ptr<TramStopPrx> tramStop = allStops.at(stopIndex).stop;
             cout << "\t" << tramStop->getName() << endl;
 
-            TramList tramList = tramStop->getNextTrams(1);
-            passenger->updateStopInfo(tramStop, tramList, Ice::Current());
+            TramList fullTramList;
+            int batchSize = 5;
+            int totalFetched = 0;
+
+            while (true) {
+                TramList batch = tramStop->getNextTrams(totalFetched + batchSize);
+
+                // Jeśli liczba tramwajów się nie zmieniła, znaczy że nic nowego nie doszło
+                if (batch.size() == fullTramList.size()) {
+                    break;
+                }
+
+                fullTramList = batch;
+                totalFetched += batchSize;
+            }
+
+            passenger->updateStopInfo(tramStop, fullTramList, Ice::Current());
         }
+
         cout << endl << endl;
 
         //pobieram informacje uzytkownika co chce sledzic
@@ -206,9 +222,9 @@ int main(int argc, char *argv[]) {
             if (tramStop) {
                 tramStop->RegisterPassenger(passengerPrx);
                 passenger->setTramStopName(name);
-                cout << "Zasubskrybowales przystanek: " << name;
+                cout << "Zasubskrybowales przystanek: " << name << endl;
                 while (1) {
-
+//                    cout << "dupka" << endl;
                 }
             } else {
                 throw "Nie znaleziono takiego przystanku";

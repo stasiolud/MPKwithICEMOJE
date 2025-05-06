@@ -46,6 +46,16 @@ public:
                                     "Tramwaj " + this->stockNumber + " dojechal do " + this->currentStop->getName();
                             passenger->notifyPassenger(info, Ice::Context());
                         }
+                    } else {
+                        i = 0;
+                        this->currentStop->removeCurrentTram(selfPrx);
+                        this->currentStop = line->getStops().at(i).stop;
+                        this->currentStop->addCurrentTram(selfPrx);
+                        for (auto &passenger: passengers) {
+                            string info =
+                                    "Tramwaj " + this->stockNumber + " dojechal do " + this->currentStop->getName();
+                            passenger->notifyPassenger(info, Ice::Context());
+                        }
                     }
                     return;
                 }
@@ -312,10 +322,6 @@ int main(int argc, char *argv[]) {
                 StopList stops = linePrx->getStops();
                 auto currentStopName = tramPrx->getLocation()->getName();
                 auto lastStopName = stops.at(stops.size() - 1).stop->getName();
-                if (currentStopName == lastStopName) {
-                    cout << "Dotarłeś do ostatniego przystanku. Koniec trasy." << endl;
-                    break;
-                }
                 tram->setNextStop();
                 cout << "Dotarłeś do kolejnego przystanku: " << tramPrx->getLocation()->getName() << endl;
 //                tram->informAllUser(tramPrx);
