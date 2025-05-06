@@ -54,29 +54,52 @@ class PassengerI:public SIP::Passenger {
 //    return false;
 //}
 
-int main (int argc, char *argv[]){
-    string address = "127.0.0.1";
-    string port = "10000";
-    string name = "mpk";
+int main (int argc, char *argv[])
+{
+    string address = "";
+    string port = "";
+    string name = "";
 
-//    cout << "Podaj adres SIP-u: ";
-//    cin >> address;
-//    cout << endl;
-//
-//    cout << "Podaj port SIP-u: ";
-//    cin >> port;
-//    cout << endl;
-//
-//    cout << "Podaj nazwę SIP-u: ";
-//    cin >> name;
-//    cout << endl;
+    ifstream configFile("configfile.txt");
+    if (configFile.is_open()) {
+        string line;
+        while (getline(configFile, line)) {
+            istringstream iss(line);
+            string key, value;
+
+            if (getline(iss, key, '=') && getline(iss, value)) {
+                // Remove any whitespace
+                key.erase(remove_if(key.begin(), key.end(), ::isspace), key.end());
+                value.erase(remove_if(value.begin(), value.end(), ::isspace), value.end());
+
+                if (key == "address") {
+                    address = value;
+                } else if (key == "port") {
+                    port = value;
+                } else if (key == "name") {
+                    name = value;
+                }
+            }
+        }
+        configFile.close();
+    } else {
+        cerr << "Unable to open configfile.txt" << endl;
+        return 1;
+    }
+
+    if (address.empty() || port.empty() || name.empty()) {
+        cerr << "Missing required configuration parameters in configfile.txt" << endl;
+        cerr << "Required parameters: address, port, name" << endl;
+        return 1;
+    }
 
     Ice::CommunicatorPtr ic;
-    try{
+    try {
+        // uzyskuje dostep do obiektu sip
         ic = Ice::initialize(argc, argv);
-        auto base = ic->stringToProxy (name+":default -h " + address + " -p " + port + " -t 8000");
+        auto base = ic->stringToProxy(name + ":default -h " + address + " -p " + port + " -t 8000");
         auto mpk = Ice::checkedCast<MPKPrx>(base);
-        if (!mpk){
+        if (!mpk) {
             throw "Invalid proxy";
         }
 
