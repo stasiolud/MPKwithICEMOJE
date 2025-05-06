@@ -4,11 +4,6 @@
 #include <memory>
 #include <fstream>
 #include <string>
-#include <TramStop.h>
-#include <Line.h>
-#include <Depo.h>
-#include <LineFactory.h>
-#include <StopFactory.h>
 
 using namespace std;
 using namespace SIP;
@@ -107,6 +102,290 @@ public:
         }
     }
 
+};
+
+class TramStopI : public SIP::TramStop {
+private:
+    string name;
+    LineList lines;
+    vector <shared_ptr<PassengerPrx>> passengers;
+    TramList coming_trams;
+    TramList currentTrams;
+public:
+    TramStopI(string name) {
+        this->name = name;
+    }
+
+    void addLine(::std::shared_ptr <LinePrx> line) {
+        lines.push_back(line);
+    }
+
+    string getName(const Ice::Current &current) override {
+        return name;
+    };
+
+    TramList getNextTrams(int howMany, const Ice::Current &current) override {
+        TramList nextTrams;
+        for (int i = 0; i < howMany; ++i) {
+            if (i < coming_trams.size()) {
+                nextTrams.push_back(coming_trams.at(i));
+            }
+        }
+        return nextTrams;
+//            TramList nextTrams;
+//            for(int i = 0; i < lines.size(); ++i){
+//
+//                TramList tramList = lines.at(i)->getTrams();
+//                int numberOfAllStops = lines.at(i)->getStops().size();
+//                for(int j = 0; j < tramList.size(); ++j){
+//
+//                    for(int k = 1; k < numberOfAllStops; ++k){
+//
+//                        StopList stopList = tramList.at(j).tram->getNextStops(k);
+//                        for(int l = 0; l < stopList.size(); ++l){
+//
+//                            if(stopList.at(l).stop->getName() == name){
+//                                TramInfo tramInfo;
+//                                tramInfo.tram = tramList.at(j).tram;
+//                                nextTrams.push_back(tramInfo);
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//            TramList resultTramList;
+//            for(int i = 0; i < howMany; i++){
+//                resultTramList.push_back(nextTrams.at(i));
+//            }
+//            return resultTramList;
+    };
+
+    void RegisterPassenger(::std::shared_ptr <PassengerPrx> passenger, const Ice::Current &current) override {
+        passengers.push_back(passenger);
+        cout << "Pasazer zasubskrybowal przystanek: " << name << endl;
+        cout << "Przystanek: " << this->name << endl;
+        cout << "Liczba zasubskrybowanych pasażerów: " << passengers.size() << endl;
+//            for(int lineIndex = 0; lineIndex < lines.size(); lineIndex++){
+//                shared_ptr<LinePrx> line = lines.at(lineIndex);
+//                TramList trams = line->getTrams();
+//                for(int tramIndex = 0; tramIndex < trams.size(); tramIndex++){
+//                    shared_ptr<TramPrx> tram = trams.at(tramIndex).tram;
+//                    tram->RegisterPassenger(passenger);
+//                }
+//            }
+    };
+
+    void UnregisterPassenger(::std::shared_ptr <PassengerPrx> passenger, const Ice::Current &current) override {
+        for (int index = 0; index < passengers.size(); index++) {
+            if (passengers.at(index)->ice_getIdentity() == passenger->ice_getIdentity()) {
+                passengers.erase(passengers.begin() + index);
+                cout << "Pasazer odsubskrybowal przystanek: " << name << endl;
+//                    for(int lineIndex = 0; lineIndex < lines.size(); lineIndex++){
+//                        shared_ptr<LinePrx> line = lines.at(lineIndex);
+//                        TramList trams = line->getTrams();
+//                        for(int tramIndex = 0; tramIndex < trams.size(); tramIndex++){
+//                            shared_ptr<TramPrx> tram = trams.at(tramIndex).tram;
+//                            tram->UnregisterPassenger(passenger);
+//                        }
+//                    }
+                break;
+            }
+        }
+    };
+
+    void UpdateTramInfo(std::shared_ptr <SIP::TramPrx> tram, SIP::Time time, const Ice::Current &current) override {
+        TramInfo tramInfo;
+        tramInfo.tram = tram;
+        tramInfo.time = time;
+
+        for (int i = 0; i < coming_trams.size(); ++i) {
+            if (coming_trams.at(i).time.hour < time.hour) {
+                coming_trams.insert(coming_trams.begin() + i, tramInfo);
+                return;
+            } else if (coming_trams.at(i).time.hour == time.hour) {
+                if (coming_trams.at(i).time.minute < time.minute) {
+                    coming_trams.insert(coming_trams.begin() + i, tramInfo);
+                    return;
+                }
+            }
+        }
+        coming_trams.push_back(tramInfo);
+    };
+
+    void addCurrentTram(shared_ptr <SIP::TramPrx> tram, const Ice::Current &current) override {
+        TramInfo tramInfo;
+        tramInfo.tram = tram;
+        currentTrams.push_back(tramInfo);
+        string header = "Tramwaje na przystanku " + name;
+        cout << header << endl;
+        cout << "Liczba zasubskrybowanych pasażerów: " << passengers.size() << endl;
+        for (const auto &passenger: passengers) {
+            cout << "pass1" << endl;
+            passenger->notifyPassenger(header, Ice::Context());
+        }
+        for (auto it = currentTrams.begin(); it != currentTrams.end(); ++it) {
+            string info = "Tramwaj: " + it->tram->getStockNumber();
+            cout << info << endl;
+            for (const auto &passenger: passengers) {
+                cout << "pass1" << endl;
+                passenger->notifyPassenger(info, Ice::Context());
+            }
+
+        }
+
+    }
+
+    void removeCurrentTram(shared_ptr <SIP::TramPrx> tram, const Ice::Current &current) override {
+        for (auto it = currentTrams.begin(); it != currentTrams.end(); ++it) {
+            if (it->tram->ice_getIdentity() == tram->ice_getIdentity()) {
+                currentTrams.erase(it);
+                break;
+            }
+        }
+    }
+
+};
+
+class LineI : public SIP::Line {
+private:
+    TramList all_trams;
+    StopList all_stops;
+    string name;
+public:
+    LineI(string name) {
+        this->name = name;
+    }
+
+    TramList getTrams(const Ice::Current &current) override {
+        return all_trams;
+    };
+
+    SIP::StopList getStops(const Ice::Current &current) override {
+        return all_stops;
+    };
+
+    string getName(const Ice::Current &current) override {
+        return name;
+    };
+
+    void registerTram(shared_ptr <TramPrx> tram, const Ice::Current &current) override {
+        TramInfo tramInfo;
+        tramInfo.tram = tram;
+
+        all_trams.push_back(tramInfo);
+
+        cout << "Nowy tramwaj o numerze: " << tram->getStockNumber() << " zostal dodany"
+             << endl;
+    };
+
+    void unregisterTram(::std::shared_ptr <TramPrx> tram, const Ice::Current &current) override {
+        for (int i = 0; i < all_trams.size(); ++i) {
+            if (all_trams.at(i).tram->getStockNumber() == tram->getStockNumber()) {
+                cout << "Zjezdza z lini tramwaj o numerze: " << tram->getStockNumber() << endl;
+                cout << "Oczekiwanie na offline" << tram->getStockNumber() << endl;
+                all_trams.erase(all_trams.begin() + i);
+                break;
+            }
+        }
+    };
+
+    void setStops(SIP::StopList sl, const Ice::Current &current) override {
+        all_stops = sl;
+    }
+
+};
+
+class DepoI : public SIP::Depo {
+private:
+    string name;
+    TramList all_trams;
+public:
+    DepoI(string name) {
+        this->name = name;
+    }
+
+    void TramOnline(::std::shared_ptr <TramPrx> tram, const Ice::Current &current) override {
+        if (tram) {
+            tram->setStatus(SIP::TramStatus::ONLINE, Ice::Context());
+            cout << "Tramwaj " << tram->getStockNumber() << " wyjechal z zajezdni" << endl;
+        } else {
+            cout << "Dany Tramwaj nie istnieje" << endl;
+        }
+    }
+
+    void TramOffline(::std::shared_ptr <TramPrx> tram, const Ice::Current &current) override {
+        if (tram) {
+            tram->setStatus(SIP::TramStatus::OFFLINE, Ice::Context());
+            cout << "Tramwaj " << tram->getStockNumber() << " zjechal do zajezdni" << endl;
+        } else {
+            cout << "Dany Tramwaj nie istnieje" << endl;
+        }
+    }
+
+    string getName(const Ice::Current &current) override {
+        return name;
+    }
+
+    void registerTram(::std::shared_ptr <TramPrx> tram, const Ice::Current &current) override {
+        TramInfo tramInfo;
+        tramInfo.tram = tram;
+        tramInfo.tram->setStatus(SIP::TramStatus::WAITONLINE, Ice::Context());
+        all_trams.push_back(tramInfo);
+        cout << "Zajezdnia zarejestrowala tramwaj o numerze: " << tram->getStockNumber() << endl;
+    };
+
+    void unregisterTram(::std::shared_ptr <TramPrx> tram, const Ice::Current &current) override {
+        TramInfo tramInfo;
+        tramInfo.tram = tram;
+        tramInfo.tram->setStatus(SIP::TramStatus::WAITOFFLINE, Ice::Context());
+    };
+
+    TramList getTrams(const Ice::Current &current) override {
+        return all_trams;
+    };
+};
+
+class LineFactoryI : public SIP::LineFactory {
+private:
+    int linesCreated = 0;
+    Ice::ObjectAdapterPtr adapter;
+public:
+    LineFactoryI(Ice::ObjectAdapterPtr adapter) : adapter(adapter) {}
+
+    std::shared_ptr <SIP::LinePrx> createLine(string name, const Ice::Current &current) override {
+        auto newLine = make_shared<LineI>(name);
+        linesCreated++;
+
+        auto linePrx = Ice::uncheckedCast<SIP::LinePrx>(adapter->addWithUUID(newLine));
+
+
+        return linePrx;
+    }
+
+    double getLoad(const Ice::Current &current = Ice::Current()) override {
+        return static_cast<double>(linesCreated);
+    }
+};
+
+class StopFactoryI : public SIP::StopFactory {
+private:
+    int stopsCreated = 0;
+    Ice::ObjectAdapterPtr adapter;
+public:
+    StopFactoryI(Ice::ObjectAdapterPtr adapter) : adapter(adapter) {}
+
+    std::shared_ptr <SIP::TramStopPrx> createStop(string name, const Ice::Current &current) override {
+        auto newStop = make_shared<TramStopI>(name);
+        stopsCreated++;
+
+        auto stopPrx = Ice::uncheckedCast<SIP::TramStopPrx>(adapter->addWithUUID(newStop));
+
+        return stopPrx;
+    }
+
+    double getLoad(const Ice::Current &current = Ice::Current()) override {
+        return static_cast<double>(stopsCreated);
+    }
 };
 
 

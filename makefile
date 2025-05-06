@@ -12,8 +12,8 @@ build_slice:
 	slice2cpp mpk.ice
 
 build_system:
-	$(CXX) $(CXXFLAGS) -c mpk.cpp system.cpp TramStop.cpp Line.cpp Depo.cpp LineFactory.cpp StopFactory.cpp
-	$(CXX) -o system mpk.o system.o TramStop.o Line.o Depo.o LineFactory.o StopFactory.o $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -c mpk.cpp system.cpp
+	$(CXX) -o system mpk.o system.o $(LDFLAGS)
 
 build_passenger:
 	$(CXX) $(CXXFLAGS) -c mpk.cpp passenger.cpp
