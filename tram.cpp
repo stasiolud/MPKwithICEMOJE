@@ -10,6 +10,7 @@ using namespace SIP;
 
 class TramI:public SIP::Tram {
     private:
+        bool online = false;
         string stockNumber;
         shared_ptr<TramStopPrx> currentStop;
         StopList stopList;
@@ -120,6 +121,13 @@ class TramI:public SIP::Tram {
 
         string getStockNumber(const Ice::Current& current) override {
             return stockNumber;
+        }
+        bool isOnline(const Ice::Current& current) override {
+            return online;
+        }
+        bool setOnline(bool online, const Ice::Current& current) override {
+            this->online = online;
+            return this->online;
         }
 };
 
@@ -272,8 +280,12 @@ int main (int argc, char *argv[])
         //dolaczanie do linii
         adapter->activate();
         linePrx->registerTram(tramPrx);
-        mpk->getDepo("Zajezdnia1")->TramOnline(tramPrx);
-
+        mpk->getDepo("Zajezdnia1")->registerTram(tramPrx);
+        cout<< "Waiting for tram to be online..." << endl;
+        while(!tram->isOnline(Ice::Current())){
+            cout << "Czekam na online tramwaju..." << endl;
+            sleep(1);
+        }
         char sign;
         cout << "Znak 'q' konczy program. Znak 'n' oznacza dotarcie do kolejnego przystanku" << endl;
         while(true){

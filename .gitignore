@@ -8,3 +8,4 @@ mpk.cpp
 mpk.o
 mpk.h
 editor.xml
+makefile

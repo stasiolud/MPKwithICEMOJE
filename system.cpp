@@ -258,6 +258,7 @@ class LineI:public SIP::Line{
 class DepoI:public SIP::Depo{
     private:
         string name;
+        TramList all_trams;
     public:
         DepoI(string name){
             this->name = name;
@@ -281,6 +282,17 @@ class DepoI:public SIP::Depo{
         string getName(const Ice::Current& current) override{
             return name;
         }
+        void registerTram(::std::shared_ptr<TramPrx> tram, const Ice::Current& current) override{
+            TramInfo tramInfo;
+            tramInfo.tram = tram;
+            all_trams.push_back(tramInfo);
+            cout << "Zajezdnia zarejestrowala tramwaj o numerze: " << tram->getStockNumber() << endl;
+        };
+        void unregisterTram(::std::shared_ptr<TramPrx> tram, const Ice::Current& current) override{
+        };
+        TramList getTrams(const Ice::Current& current) override{
+            return all_trams;
+        };
 };
 
 class LineFactoryI:public SIP::LineFactory {
@@ -457,7 +469,43 @@ int main (int argc, char *argv[]){
         }
         //aktywuje nasluchiwanie
         adapter->activate();
-
+        while(true){
+            cout<< "Kliknij d - aby wyswietlic depo" << endl;
+            char sign;
+            cin >> sign;
+            if(sign == 'd'){
+                cout << "Zajezdnia: " << depoPrx->getName() << endl;
+                DepoList depoList = mpk->getDepos(Ice::Current());
+                for(int i = 0; i < depoList.size(); ++i){
+                    cout << "\t" << depoList.at(i).stop->getName() << endl;
+                }
+                cout << "Zarejestrowane tramwaje: " << endl;
+                TramList tramList = depoPrx->getTrams(Ice::Context());
+                for(int i = 0; i < tramList.size(); ++i){
+                    cout << i << ". "<<"\t" << tramList.at(i).tram->getStockNumber()<< " - "
+                         << ((tramList.at(i).tram->isOnline()) ? " jezdzi" : " waiting for accept from system")
+                         << endl;
+                }
+                cout<< "Click 'q' to exit from depo, Pick number to make it online" << endl;
+                int number;
+                cin >> number;
+                if(number<0 || number >= tramList.size()){
+                    cout << "Zajezdnia zamyka sie" << endl;
+                    break;
+                }
+                else{
+                    shared_ptr<TramPrx> tram = tramList.at(number).tram;
+                    if(tram->isOnline()){
+                        cout << "Tramwaj jest online" << endl;
+                    }else{
+                        tram->setOnline(true);
+                        depoPrx->TramOnline(tram, Ice::Context());
+                        cout << "Tramwaj " << tram->getStockNumber() << " jest online" << endl;
+                    }
+                }
+            }
+            sleep(1);
+        }
         //zawieszam watek az do przerwania
         ic->waitForShutdown();
 

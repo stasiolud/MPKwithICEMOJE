@@ -76,8 +76,11 @@ module SIP {
   };
 
   interface Depo {
+      void registerTram(Tram* t);
+      void unregisterTram(Tram* t);
       void TramOnline(Tram* t);
       void TramOffline(Tram* t);
+      TramList getTrams();
       string getName();
   };
 
@@ -89,6 +92,8 @@ module SIP {
     void RegisterPassenger(Passenger* p);
     void UnregisterPassenger(Passenger* p);
     string getStockNumber();
+    bool isOnline();
+    bool setOnline(bool online);
   };
 
   interface Passenger{
