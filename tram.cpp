@@ -212,7 +212,7 @@ int main (int argc, char *argv[])
         }
 
         //tworze obiekt ice
-        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints ("TramAdapter", "default -p "+ tramPort + " -h " + address);
+        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints ("TramAdapter", "default -p "+ tramPort);
 
         //pobieram numer tramwaju
         string tramStockNumber;

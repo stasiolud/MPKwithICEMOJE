@@ -7,3 +7,6 @@ Srebra
 Brazowa
 Drewniana
 Brukowa
+Maslana
+Slodowa
+Traugutta

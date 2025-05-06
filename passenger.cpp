@@ -59,7 +59,7 @@ int main (int argc, char *argv[])
     string address = "";
     string port = "";
     string name = "";
-
+    string tramPort = argv[1];
     ifstream configFile("configfile.txt");
     if (configFile.is_open()) {
         string line;
@@ -92,7 +92,10 @@ int main (int argc, char *argv[])
         cerr << "Required parameters: address, port, name" << endl;
         return 1;
     }
-
+    cout<<"Podaj imie mistrzu: "<<endl;
+    string nameUser;
+    cin >> nameUser;
+    std::cin.clear();
     Ice::CommunicatorPtr ic;
     try {
         // uzyskuje dostep do obiektu sip
@@ -104,12 +107,12 @@ int main (int argc, char *argv[])
         }
 
         //tworze obiekt ice
-        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints ("PassengerAdapter", "default -p 10004");
+        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints ("PassengerAdapter", "default -p "+ tramPort);
 
         //tworze servant użytkownika
         auto passenger = make_shared<PassengerI>();
         auto passengerPrx = Ice::uncheckedCast<PassengerPrx>(adapter->addWithUUID(passenger));
-        adapter->add(passenger, Ice::stringToIdentity("passenger1"));
+        adapter->add(passenger, Ice::stringToIdentity(nameUser));
         //pobieram dostepne linie
         LineList lines = mpk->getLines();
 
