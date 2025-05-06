@@ -43,6 +43,8 @@ module SIP {
      void RegisterPassenger(Passenger* p);
      void UnregisterPassenger(Passenger* p);
      void UpdateTramInfo(Tram* tram, Time time);
+     void addCurrentTram(Tram* tram);
+     void removeCurrentTram(Tram* tram);
   };
 
   interface Line
@@ -105,5 +107,6 @@ module SIP {
   interface Passenger{
 	  void updateTramInfo(Tram* tram, StopList stops);
 	  void updateStopInfo(TramStop* stop, TramList trams);
+	  void notifyPassenger(string info);
   };
 };
