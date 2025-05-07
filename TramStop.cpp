@@ -28,14 +28,12 @@ TramList TramStopI::getNextTrams(int howMany, const Ice::Current &current) {
 void TramStopI::RegisterPassenger(shared_ptr <PassengerPrx> passenger, const Ice::Current &current) {
     passengers.push_back(passenger);
     cout << "Pasazer zasubskrybowal przystanek: " << name << endl;
-    cout << "Przystanek: " << this->name << endl;
-    cout << "Liczba zasubskrybowanych pasażerów: " << passengers.size() << endl;
 }
 
 void TramStopI::UnregisterPassenger(shared_ptr <PassengerPrx> passenger, const Ice::Current &current) {
-    for (int index = 0; index < passengers.size(); index++) {
-        if (passengers.at(index)->ice_getIdentity() == passenger->ice_getIdentity()) {
-            passengers.erase(passengers.begin() + index);
+    for (int i = 0; i < passengers.size(); i++) {
+        if (passengers.at(i)->ice_getIdentity() == passenger->ice_getIdentity()) {
+            passengers.erase(passengers.begin() + i);
             cout << "Pasazer odsubskrybowal przystanek: " << name << endl;
             break;
         }
@@ -66,17 +64,12 @@ void TramStopI::addCurrentTram(shared_ptr <TramPrx> tram, const Ice::Current &cu
     tramInfo.tram = tram;
     currentTrams.push_back(tramInfo);
     string header = "Tramwaje na przystanku " + name;
-    cout << header << endl;
-    cout << "Liczba zasubskrybowanych pasażerów: " << passengers.size() << endl;
     for (const auto &passenger: passengers) {
-        cout << "pass1" << endl;
         passenger->notifyPassenger(header, Ice::Context());
     }
     for (auto it = currentTrams.begin(); it != currentTrams.end(); ++it) {
         string info = "Tramwaj: " + it->tram->getStockNumber();
-        cout << info << endl;
         for (const auto &passenger: passengers) {
-            cout << "pass1" << endl;
             passenger->notifyPassenger(info, Ice::Context());
         }
 

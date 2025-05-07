@@ -18,8 +18,8 @@ private:
     LineList all_lines;
     StopList all_stops;
     DepoList all_depos;
-    vector <std::shared_ptr<LineFactoryPrx>> lineFactories;
-    vector <std::shared_ptr<StopFactoryPrx>> stopFactories;
+    vector <shared_ptr<LineFactoryPrx>> lineFactories;
+    vector <shared_ptr<StopFactoryPrx>> stopFactories;
 public:
     LineList getLines(const Ice::Current &current) override {
         return all_lines;
@@ -35,7 +35,7 @@ public:
         all_lines.push_back(line);
     }
 
-    void registerDepo(::std::shared_ptr <DepoPrx> depo, const Ice::Current &current) override {
+    void registerDepo(shared_ptr <DepoPrx> depo, const Ice::Current &current) override {
         cout << "Nowa zajezdnia o nazwie: " << depo->getName() << endl;
         DepoInfo depoInfo;
         depoInfo.stop = depo;
@@ -43,11 +43,11 @@ public:
         all_depos.push_back(depoInfo);
     }
 
-    void unregisterDepo(::std::shared_ptr <DepoPrx> depo, const Ice::Current &current) override {
-        for (int index = 0; index < all_depos.size(); index++) {
-            if (all_depos.at(index).stop->getName() == depo->getName()) {
+    void unregisterDepo(shared_ptr <DepoPrx> depo, const Ice::Current &current) override {
+        for (int i = 0; i < all_depos.size(); i++) {
+            if (all_depos.at(i).stop->getName() == depo->getName()) {
                 cout << "Usuwam zajezdnie o nazwie: " << depo->getName() << endl;
-                all_depos.erase(all_depos.begin() + index);
+                all_depos.erase(all_depos.begin() + i);
                 break;
             }
         }
@@ -75,75 +75,94 @@ public:
         return all_depos;
     }
 
-    void registerLineFactory(std::shared_ptr <SIP::LineFactoryPrx> lf, const Ice::Current &current) override {
+    void registerLineFactory(shared_ptr <LineFactoryPrx> lf, const Ice::Current &current) override {
         // Sprawdzenie, czy fabryka już jest zarejestrowana
-        if (std::find(lineFactories.begin(), lineFactories.end(), lf) == lineFactories.end()) {
+        if (find(lineFactories.begin(), lineFactories.end(), lf) == lineFactories.end()) {
             lineFactories.push_back(lf);
-            std::cout << "Fabryka linii zarejestrowana." << std::endl;
+            cout << "Fabryka linii zarejestrowana" << endl;
         }
     }
 
-    void unregisterLineFactory(std::shared_ptr <SIP::LineFactoryPrx> lf, const Ice::Current &current) override {
-        auto it = std::find(lineFactories.begin(), lineFactories.end(), lf);
+    void unregisterLineFactory(shared_ptr <LineFactoryPrx> lf, const Ice::Current &current) override {
+        auto it = find(lineFactories.begin(), lineFactories.end(), lf);
         if (it != lineFactories.end()) {
             lineFactories.erase(it);
-            std::cout << "LineFactory unregistered." << std::endl;
+            cout << "Fabryka linii wyrejestrowana" << endl;
         }
     }
 
-    void registerStopFactory(std::shared_ptr <SIP::StopFactoryPrx> lf, const Ice::Current &current) override {
+    void registerStopFactory(shared_ptr <StopFactoryPrx> lf, const Ice::Current &current) override {
         // Sprawdzenie, czy fabryka już jest zarejestrowana
-        if (std::find(stopFactories.begin(), stopFactories.end(), lf) == stopFactories.end()) {
+        if (find(stopFactories.begin(), stopFactories.end(), lf) == stopFactories.end()) {
             stopFactories.push_back(lf);
-            std::cout << "StopFactory registered." << std::endl;
+            cout << "Fabryka przystanku zarejestrowana" << endl;
         }
     }
 
-    void unregisterStopFactory(std::shared_ptr <SIP::StopFactoryPrx> lf, const Ice::Current &current) override {
-        auto it = std::find(stopFactories.begin(), stopFactories.end(), lf);
+    void unregisterStopFactory(shared_ptr <StopFactoryPrx> lf, const Ice::Current &current) override {
+        auto it = find(stopFactories.begin(), stopFactories.end(), lf);
         if (it != stopFactories.end()) {
             stopFactories.erase(it);
-            std::cout << "StopFactory unregistered." << std::endl;
+            cout << "Fabryka stopu wyrejestrowana" << endl;
         }
     }
 
 };
 
+map <string, string> loadConfig(const string &filename) {
+    ifstream file(filename);
+    map <string, string> config;
+    string line;
+
+    while (getline(file, line)) {
+        istringstream is_line(line);
+        string key;
+        if (getline(is_line, key, '=')) {
+            string value;
+            if (getline(is_line, value)) {
+                config[key] = value;
+            }
+        }
+    }
+
+    return config;
+}
+
 
 int main(int argc, char *argv[]) {
     Ice::CommunicatorPtr ic;
     try {
+        auto config = loadConfig("configfile.txt");
 
-        //tworze instancje obiektu ice
-        ic = Ice::initialize(argc, argv);
-        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints("MPKAdapter", "tcp -h 192.168.0.11 -p 10000"); //moje IP trzeba wstawic
+        string address = config["address"];
+        string port = config["port"];
+        string endpoint = "tcp -h " + address + " -p " + port;
 
-        //tworze servant mpk
+        Ice::CommunicatorHolder ich(argc, argv);
+        auto adapter = ich->createObjectAdapterWithEndpoints("MPKAdapter", endpoint);
+
+        // ========== REJESTRACJA OBIEKTÓW ==========
+        cout << "===== REJESTRACJA OBIEKTÓW SYSTEMU =====" << endl;
+
         auto mpk = make_shared<MPK_I>();
         adapter->add(mpk, Ice::stringToIdentity("mpk"));
-
-
 
         auto depo = make_shared<DepoI>("Zajezdnia1");
         auto depoPrx = Ice::uncheckedCast<DepoPrx>(adapter->addWithUUID(depo));
         mpk->registerDepo(depoPrx, Ice::Current());
 
-
         auto lineFactory = make_shared<LineFactoryI>(adapter);
         auto lineFactoryPrx = Ice::uncheckedCast<LineFactoryPrx>(adapter->addWithUUID(lineFactory));
-
         mpk->registerLineFactory(lineFactoryPrx, Ice::Current());
 
         auto stopFactory = make_shared<StopFactoryI>(adapter);
         auto stopFactoryPrx = Ice::uncheckedCast<StopFactoryPrx>(adapter->addWithUUID(stopFactory));
-
         mpk->registerStopFactory(stopFactoryPrx, Ice::Current());
 
-        //wczytuje przystanki
+        cout << "\n===== WCZYTYWANIE PRZYSTANKÓW =====" << endl;
         ifstream stops_file("stops.txt");
-
         if (!stops_file.is_open()) {
-            cerr << "Nie można otworzyć pliku." << endl;
+            cerr << "Błąd: nie można otworzyć pliku stops.txt." << endl;
             throw "File error";
         }
 
@@ -152,46 +171,36 @@ int main(int argc, char *argv[]) {
             auto tramStopPrx = stopFactory->createStop(stop_name, Ice::Current());
             mpk->addStop(tramStopPrx);
         }
+
+        cout << "\n===== WCZYTYWANIE LINII I PRZYSTANKÓW =====" << endl;
         ifstream lines_file("lines.txt");
         if (!lines_file.is_open()) {
-            cerr << "Nie można otworzyć pliku." << endl;
+            cerr << "Błąd: nie można otworzyć pliku lines.txt." << endl;
             throw "File error";
         }
 
         string file_line;
-
-
-        cout << "Dostepne linie i przystanki: " << endl;
         while (getline(lines_file, file_line)) {
-
-            //pozyskuje numer linii
             size_t separator_position = file_line.find(':');
             string line_number = file_line.substr(0, separator_position);
-            cout << "Linia nr: " << line_number << endl;
+            string tramStopsNames = file_line.substr(separator_position + 1);
+            cout << "Linia: " << line_number << endl;
 
-            //tworze obiekt linii
             auto linePrx = lineFactory->createLine(line_number, Ice::Current());
 
-
-
-            //pozyskuje id przystankow, szukam przystankow i dodaje do linii
-            string tramStopsNames = file_line.substr(separator_position + 1);
-
             istringstream iss(tramStopsNames);
-            string stop_name;
-
-
+            StopList stopList;
             time_t currentTime;
             time(&currentTime);
             tm *timeNow = localtime(&currentTime);
 
-            StopList stopList;
             while (iss >> stop_name) {
                 auto tramStopPrx = mpk->getTramStop(stop_name, Ice::Current());
                 if (!tramStopPrx) {
                     tramStopPrx = stopFactory->createStop(stop_name, Ice::Current());
                     mpk->addStop(tramStopPrx);
                 }
+
                 StopInfo stopInfo;
                 stopInfo.time.hour = timeNow->tm_hour;
                 stopInfo.time.minute = timeNow->tm_min;
@@ -200,61 +209,60 @@ int main(int argc, char *argv[]) {
             }
 
             linePrx->setStops(stopList);
+            mpk->addLine(linePrx, Ice::Current());
 
-            if (linePrx != ICE_NULLPTR) {
-                mpk->addLine(linePrx, Ice::Current());
-            }
-
+            // wypisanie przystanków
             istringstream ss(tramStopsNames);
             string name;
-
-            cout << "\t przystanki: ";
+            cout << "\tPrzystanki: ";
             while (ss >> name) {
-                shared_ptr <TramStopPrx> tramStopPrx = mpk->getTramStop(name, Ice::Current());
-                if (!tramStopPrx) {
-                    cout << "Brak przystankow";
-                } else {
-                    cout << tramStopPrx->getName() << " ";
-                }
+                auto tramStopPrx = mpk->getTramStop(name, Ice::Current());
+                cout << tramStopPrx->getName() << " ";
             }
-            cout << endl;
+            cout << "\n" << endl;
         }
-        //aktywuje nasluchiwanie
+
         adapter->activate();
+        cout << "\n===== SYSTEM GOTOWY =====" << endl;
+
+
         while (true) {
-            cout << "Kliknij d - aby wyswietlic depo" << endl;
+            cout << "\nNaciśnij 'd' aby przejść do zajezdni: ";
             char sign;
             cin >> sign;
+
             if (sign == 'd') {
-                cout << "Zajezdnia: " << depoPrx->getName() << endl;
-                DepoList depoList = mpk->getDepos(Ice::Current());
-                for (int i = 0; i < depoList.size(); ++i) {
-                    cout << "\t" << depoList.at(i).stop->getName() << endl;
-                }
-                cout << "Zarejestrowane tramwaje: " << endl;
                 TramList tramList = depoPrx->getTrams(Ice::Context());
+                cout << "\n===== TRAMWAJE W ZAJEDZNI =====" << endl;
                 for (int i = 0; i < tramList.size(); ++i) {
-                    cout << i << ". " << tramList.at(i).tram->getStockNumber() << " - ";
-                    if (tramList.at(i).tram->getStatus(Ice::Context()) == SIP::TramStatus::ONLINE) {
-                        cout << "driving" << endl;
-                    } else if (tramList.at(i).tram->getStatus(Ice::Context()) == SIP::TramStatus::OFFLINE) {
-                        cout << "offline" << endl;
-                    } else if (tramList.at(i).tram->getStatus(Ice::Context()) == SIP::TramStatus::WAITONLINE) {
-                        cout << "waiting to online" << endl;
-                    } else if (tramList.at(i).tram->getStatus(Ice::Context()) == SIP::TramStatus::WAITOFFLINE) {
-                        cout << "waiting to offline" << endl;
-                    } else {
-                        cout << "unknown" << endl;
+                    cout << i << ". " << tramList[i].tram->getStockNumber() << " - ";
+                    switch (tramList[i].tram->getStatus(Ice::Context())) {
+                        case TramStatus::ONLINE:
+                            cout << "driving";
+                            break;
+                        case TramStatus::OFFLINE:
+                            cout << "offline";
+                            break;
+                        case TramStatus::WAITONLINE:
+                            cout << "waiting to online";
+                            break;
+                        case TramStatus::WAITOFFLINE:
+                            cout << "waiting to offline";
+                            break;
+                        default:
+                            cout << "unknown";
                     }
+                    cout << endl;
                 }
-                cout << "Wpisz '<numer> ONLINE' lub '<numer> OFFLINE', lub 'q' aby wyjsc z depo: " << endl;
+
+                cout << "\nWpisz '<numer> ONLINE' lub '<numer> OFFLINE', lub 'q' aby wyjść." << endl;
                 string command;
-                cin.ignore(); // czyści bufor po wcześniejszym cin >> sign
+                cin.ignore();
                 getline(cin, command);
 
                 if (command == "q") {
-                    cout << "Zajezdnia zamyka sie" << endl;
-                    break;
+                    cout << "Opuszczanie..." << endl;
+                    return 0;
                 }
 
                 istringstream iss(command);
@@ -263,34 +271,33 @@ int main(int argc, char *argv[]) {
                 iss >> number >> action;
 
                 if (number < 0 || number >= tramList.size()) {
-                    cout << "Nieprawidlowy numer tramwaju." << endl;
-                } else if (action == "ONLINE") {
-                    shared_ptr <TramPrx> tram = tramList.at(number).tram;
-                    if (tram->getStatus(Ice::Context()) == SIP::TramStatus::ONLINE) {
-                        cout << "Tramwaj jest juz online" << endl;
-                    } else {
-                        depoPrx->TramOnline(tram, Ice::Context());
-                        cout << "Tramwaj " << tram->getStockNumber() << " jest online" << endl;
-                    }
-                } else if (action == "OFFLINE") {
-                    shared_ptr <TramPrx> tram = tramList.at(number).tram;
-                    if (tram->getStatus(Ice::Context()) == SIP::TramStatus::OFFLINE) {
-                        cout << "Tramwaj jest juz offline" << endl;
-                    } else {
-                        depoPrx->TramOffline(tram, Ice::Context());
-                        cout << "Tramwaj " << tram->getStockNumber() << " jest offline" << endl;
-                    }
+                    cout << "Błąd: nieprawidłowy numer tramwaju." << endl;
                 } else {
-                    cout << "Nieznana komenda." << endl;
+                    auto tram = tramList[number].tram;
+                    if (action == "ONLINE") {
+                        if (tram->getStatus(Ice::Context()) == TramStatus::ONLINE) {
+                            cout << "Tramwaj jest już online." << endl;
+                        } else {
+                            depoPrx->TramOnline(tram, Ice::Context());
+                            cout << "Tramwaj " << tram->getStockNumber() << " przełączony na ONLINE." << endl;
+                        }
+                    } else if (action == "OFFLINE") {
+                        if (tram->getStatus(Ice::Context()) == TramStatus::OFFLINE) {
+                            cout << "Tramwaj jest już offline." << endl;
+                        } else {
+                            depoPrx->TramOffline(tram, Ice::Context());
+                            cout << "Tramwaj " << tram->getStockNumber() << " przełączony na OFFLINE." << endl;
+                        }
+                    } else {
+                        cout << "Nieznana komenda." << endl;
+                    }
                 }
             }
-
         }
-        //zawieszam watek az do przerwania
+
         ic->waitForShutdown();
 
-    }
-    catch (const Ice::Exception &e) {
+    } catch (const Ice::Exception &e) {
         cout << e << endl;
     } catch (const char *msg) {
         cout << msg << endl;
@@ -304,7 +311,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    cout << "Koniec pracy systemu" << endl;
+    cout << "\n===== KONIEC PRACY SYSTEMU =====" << endl;
+    return 0;
 }
-
-

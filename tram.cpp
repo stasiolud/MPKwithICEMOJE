@@ -16,13 +16,10 @@ private:
     StopList stopList;
     vector <shared_ptr<PassengerPrx>> passengers;
     shared_ptr <LinePrx> line;
-    std::shared_ptr <TramPrx> selfPrx;
+    shared_ptr <TramPrx> selfPrx;
 
 public:
-    TramI(string stockNumber) {
-        this->stockNumber = stockNumber;
-        this->status = SIP::TramStatus::OFFLINE;
-    };
+    TramI(string stockNumber) : stockNumber(stockNumber), status(TramStatus::OFFLINE) {};
 
     void addStop(const struct StopInfo stopInfo) {
         stopList.push_back(stopInfo);
@@ -129,10 +126,10 @@ public:
     };
 
     void UnregisterPassenger(shared_ptr <PassengerPrx> passenger, const Ice::Current &current) override {
-        for (int index = 0; index < passengers.size(); index++) {
-            if (passengers.at(index)->ice_getIdentity() == passenger->ice_getIdentity()) {
+        for (int i = 0; i < passengers.size(); i++) {
+            if (passengers.at(i)->ice_getIdentity() == passenger->ice_getIdentity()) {
                 cout << "Uzytkownik zakonczyl subskrypcje" << endl;
-                passengers.erase(passengers.begin() + index);
+                passengers.erase(passengers.begin() + i);
                 break;
             }
         }
@@ -169,15 +166,30 @@ bool checkName(string line_name, LineList lines) {
     return false;
 }
 
+string loadAddressFromFile(const string &filename) {
+    ifstream file(filename);
+    string address;
+    if (file.is_open()) {
+        getline(file, address);
+        file.close();
+    } else {
+        throw runtime_error("Nie można otworzyć pliku: " + filename);
+    }
+    return address;
+}
+
 int main(int argc, char *argv[]) {
     string address = "";
     string port = "";
     string name = "";
+
     if (argc < 2) {
-        cerr << "Usage: " << argv[0] << " <tramPort ex. 10010>" << endl;
+        cout << "Uzycie: " << argv[0] << " <tramPort>" << endl;
         return 1;
     }
+
     string tramPort = argv[1];
+
     ifstream configFile("configfile.txt");
     if (configFile.is_open()) {
         string line;
@@ -200,19 +212,17 @@ int main(int argc, char *argv[]) {
         }
         configFile.close();
     } else {
-        cerr << "Unable to open configfile.txt" << endl;
+        cout << "Problem z configfile.txt" << endl;
         return 1;
     }
 
     if (address.empty() || port.empty() || name.empty()) {
-        cerr << "Missing required configuration parameters in configfile.txt" << endl;
-        cerr << "Required parameters: address, port, name" << endl;
+        cout << "Brakuje argumentow w configfile.txt" << endl;
         return 1;
     }
 
     Ice::CommunicatorPtr ic;
     try {
-        // uzyskuje dostep do obiektu sip
         ic = Ice::initialize(argc, argv);
         auto base = ic->stringToProxy(name + ":default -h " + address + " -p " + port + " -t 8000");
         auto mpk = Ice::checkedCast<MPKPrx>(base);
@@ -220,120 +230,127 @@ int main(int argc, char *argv[]) {
             throw "Invalid proxy";
         }
 
-        //pobieram dostepne linie
         LineList lines = mpk->getLines();
 
-        //wyswietlam info o dostepnych liniach
-        cout << "Dostepne linie: " << endl << endl;
-        for (int index = 0; index < lines.size(); ++index) {
-            cout << "Linia nr: " << lines.at(index)->getName() << endl << "\tPrzystanki: " << endl;
-            StopList tramStops = lines.at(index)->getStops();
-            for (int stopIndex = 0; stopIndex < tramStops.size(); stopIndex++) {
-                cout << "\t\t" << tramStops.at(stopIndex).stop->getName() << endl;
+        cout << "DOSTĘPNE LINIE:\n" << endl;
+        for (const auto &line: lines) {
+            cout << "Linia: " << line->getName() << "\nPrzystanki:" << endl;
+            for (const auto &stopInfo: line->getStops()) {
+                cout << "  - " << stopInfo.stop->getName() << endl;
             }
-            cout << endl << endl;
+            cout << endl;
         }
 
-        //tworze obiekt ice
-        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints("TramAdapter", "tcp -h <adres tramwaju> -p " + tramPort);
+        string userAddress = loadAddressFromFile("configuserfile.txt");
+        string userEndpoint = "tcp -h " + userAddress + " -p " + tramPort;
 
-        //pobieram numer tramwaju
+        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints("TramAdapter", userEndpoint);
+
         string tramStockNumber;
-        cout << "Wprowadź swój numer tramwaju: ";
+        cout << "Podaj numer tramwaju: ";
         cin >> tramStockNumber;
-        std::cin.clear();
+        cin.clear();
         cout << endl;
 
-        //tworze servant tramwaju
         auto tram = make_shared<TramI>(tramStockNumber);
         auto tramPrx = Ice::uncheckedCast<TramPrx>(adapter->addWithUUID(tram));
         tram->setProxy(tramPrx);
         adapter->add(tram, Ice::stringToIdentity("tram" + tramStockNumber));
 
-        //wybieram do ktorej lini dolaczam
         string line_name;
-        cout << "Wybierz linie, wpisujac nazwe: ";
+        cout << "Podaj nazwę linii: ";
         cin >> line_name;
-
         while (!checkName(line_name, lines)) {
-            cout << "Niewlasciwa linia, wybierz ponownie: " << endl;
+            cout << "Nieprawidłowa linia. Podaj ponownie: ";
             cin >> line_name;
         }
 
-        std::cin.clear();
-
-        //ustawienie czasu dotarcia na przystanki
-        time_t currentTime;
-        time(&currentTime);
-        tm *timeNow = localtime(&currentTime);
-
         int ID = getIdLine(lines, line_name);
-
         shared_ptr <LinePrx> linePrx = lines.at(ID);
         tram->setLine(linePrx, Ice::Current());
 
         StopList tramStops = linePrx->getStops();
-        int hour = timeNow->tm_hour;
-        int minute = timeNow->tm_min;
-        int interval = 5;
 
-        for (int index = 0; index < tramStops.size(); index++) {
+        time_t currentTime;
+        time(&currentTime);
+        tm *timeNow = localtime(&currentTime);
+
+        int baseHour = timeNow->tm_hour;
+        int baseMinute = timeNow->tm_min;
+        int interval = 3;
+
+        int currentMinutes = baseHour * 60 + baseMinute;
+
+        for (const auto &stop : tramStops) {
             Time timeOfDay;
-            timeOfDay.hour = hour;
-            timeOfDay.minute = minute;
+            timeOfDay.hour = currentMinutes / 60;
+            timeOfDay.minute = currentMinutes % 60;
 
-
-            //tramStops.at(index).time = timeOfDay;
             StopInfo stopInfo;
             stopInfo.time = timeOfDay;
-            shared_ptr <TramStopPrx> tramStopPrx = tramStops.at(index).stop;
-            stopInfo.stop = tramStopPrx;
+            stopInfo.stop = stop.stop;
 
             tram->addStop(stopInfo);
-            tramStops.at(index).stop->UpdateTramInfo(tramPrx, timeOfDay);
+            stop.stop->UpdateTramInfo(tramPrx, timeOfDay);
 
-            minute += interval;
-            if (minute >= 60) {
-                hour++;
-                minute = minute - 60;
-            }
+            currentMinutes += interval;
         }
 
-        //tram->setNextStop();
 
-        //dolaczanie do linii
         adapter->activate();
         linePrx->registerTram(tramPrx);
         mpk->getDepo("Zajezdnia1")->registerTram(tramPrx);
-        cout << "Waiting for tram to be online..." << endl;
-        while (tram->getStatus(Ice::Current()) != SIP::TramStatus::ONLINE) {
-            cout << "Czekam na online tramwaju..." << endl;
 
+        cout << endl;
+        cout << "==============================" << endl;
+        cout << "   OCZEKIWANIE NA STATUS ONLINE" << endl;
+        cout << "==============================" << endl;
+
+        while (tram->getStatus(Ice::Current()) != SIP::TramStatus::ONLINE) {
+            cout << "Czekam na tramwaj w trybie ONLINE..." << endl;
         }
+
+        cout << endl;
+        cout << "==============================" << endl;
+        cout << "     TRAMWAJ JEST ONLINE" << endl;
+        cout << "Numer tramwaju: " << tramPrx->getStockNumber() << endl;
+        cout << "==============================" << endl;
+
+        cout << endl;
+        cout << "INSTRUKCJA OBSŁUGI:" << endl;
+        cout << "  n - przejazd do następnego przystanku" << endl;
+        cout << "  q - zakończ działanie tramwaju" << endl;
+        cout << "==============================" << endl;
+
         char sign;
-        cout << "Znak 'q' konczy program. Znak 'n' oznacza dotarcie do kolejnego przystanku" << endl;
         while (true) {
+            cout << endl << "Wybierz opcję [n/q]: " << endl;
             cin >> sign;
+
             if (sign == 'q') {
-                //tram->unregisterAllUser(tramPrx);
+                cout << "Kończenie pracy tramwaju..." << endl;
                 break;
             }
+
             if (sign == 'n') {
-                StopList stops = linePrx->getStops();
-                auto currentStopName = tramPrx->getLocation()->getName();
-                auto lastStopName = stops.at(stops.size() - 1).stop->getName();
                 tram->setNextStop();
-                cout << "Dotarłeś do kolejnego przystanku: " << tramPrx->getLocation()->getName() << endl;
-//                tram->informAllUser(tramPrx);
+                string stopName = tramPrx->getLocation()->getName();
+                cout << "--------------------------------" << endl;
+                cout << "Dotarłeś do przystanku: " << stopName << endl;
+                cout << "--------------------------------" << endl;
+            } else {
+                cout << "Nieznana komenda. Wpisz 'n' lub 'q'." << endl;
             }
         }
-        linePrx->unregisterTram(tramPrx);
-        mpk->getDepo("Zajezdnia1")->unregisterTram(tramPrx);
-        cout << "Jestes w zajezdni, czekam na offline tramwaju..." << endl;
-        while (tram->getStatus(Ice::Current()) != SIP::TramStatus::OFFLINE) {
-            cout << "Czekam na offline tramwaju..." << endl;
 
+
+        mpk->getDepo("Zajezdnia1")->unregisterTram(tramPrx);
+
+        cout << "Oczekiwanie na przejście tramwaju w tryb OFFLINE..." << endl;
+        while (tram->getStatus(Ice::Current()) != SIP::TramStatus::OFFLINE) {
+            cout << "Czekam na tryb OFFLINE..." << endl;
         }
+        linePrx->unregisterTram(tramPrx);
 
     } catch (const Ice::Exception &e) {
         cout << e << endl;
@@ -350,4 +367,5 @@ int main(int argc, char *argv[]) {
     }
 
     cout << "Koniec programu tramwaj" << endl;
+    return 0;
 }

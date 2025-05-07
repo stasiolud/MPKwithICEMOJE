@@ -28,8 +28,6 @@ void LineI::registerTram(shared_ptr <TramPrx> tram, const Ice::Current &current)
 void LineI::unregisterTram(shared_ptr <TramPrx> tram, const Ice::Current &current) {
     for (int i = 0; i < all_trams.size(); ++i) {
         if (all_trams.at(i).tram->getStockNumber() == tram->getStockNumber()) {
-            cout << "Zjezdza z lini tramwaj o numerze: " << tram->getStockNumber() << endl;
-            cout << "Oczekiwanie na offline" << tram->getStockNumber() << endl;
             all_trams.erase(all_trams.begin() + i);
             break;
         }

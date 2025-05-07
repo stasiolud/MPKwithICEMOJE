@@ -16,11 +16,19 @@ void DepoI::TramOnline(shared_ptr <TramPrx> tram, const Ice::Current &current) {
 }
 
 void DepoI::TramOffline(shared_ptr <TramPrx> tram, const Ice::Current &current) {
-    if (tram) {
-        tram->setStatus(TramStatus::OFFLINE, Ice::Context());
-        cout << "Tramwaj " << tram->getStockNumber() << " zjechal do zajezdni" << endl;
-    } else {
-        cout << "Dany Tramwaj nie istnieje" << endl;
+    if (tram == nullptr) {
+        cout << "Nie znaleziono tramwaju." << endl;
+        return;
+    }
+
+    tram->setStatus(TramStatus::OFFLINE, current.ctx);
+    cout << "Tramwaj " << tram->getStockNumber() << " został wyłączony i wrócił do zajezdni." << endl;
+
+    for (auto it = all_trams.begin(); it != all_trams.end(); ++it) {
+        if (it->tram->ice_getIdentity() == tram->ice_getIdentity()) {
+            all_trams.erase(it);
+            break;
+        }
     }
 }
 
