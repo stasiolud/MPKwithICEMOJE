@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
         }
 
         //tworze obiekt ice
-        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints("TramAdapter", "default -p " + tramPort);
+        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints("TramAdapter", "tcp -h <adres tramwaju> -p " + tramPort);
 
         //pobieram numer tramwaju
         string tramStockNumber;
@@ -308,7 +308,7 @@ int main(int argc, char *argv[]) {
         cout << "Waiting for tram to be online..." << endl;
         while (tram->getStatus(Ice::Current()) != SIP::TramStatus::ONLINE) {
             cout << "Czekam na online tramwaju..." << endl;
-            sleep(1);
+
         }
         char sign;
         cout << "Znak 'q' konczy program. Znak 'n' oznacza dotarcie do kolejnego przystanku" << endl;
@@ -332,7 +332,7 @@ int main(int argc, char *argv[]) {
         cout << "Jestes w zajezdni, czekam na offline tramwaju..." << endl;
         while (tram->getStatus(Ice::Current()) != SIP::TramStatus::OFFLINE) {
             cout << "Czekam na offline tramwaju..." << endl;
-            sleep(1);
+
         }
 
     } catch (const Ice::Exception &e) {

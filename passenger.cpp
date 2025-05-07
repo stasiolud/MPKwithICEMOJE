@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
 
         //tworze obiekt ice
         Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints("PassengerAdapter",
-                                                                             "default -p " + tramPort);
+                                                                             "tcp -h <adres klienta> -p " + tramPort);
 
         //tworze servant użytkownika
         auto passenger = make_shared<PassengerI>();

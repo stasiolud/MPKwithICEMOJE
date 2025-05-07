@@ -116,26 +116,18 @@ int main(int argc, char *argv[]) {
 
         //tworze instancje obiektu ice
         ic = Ice::initialize(argc, argv);
-        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints("MPKAdapter", "default -p 10000");
+        Ice::ObjectAdapterPtr adapter = ic->createObjectAdapterWithEndpoints("MPKAdapter", "tcp -h 192.168.0.11 -p 10000"); //moje IP trzeba wstawic
 
         //tworze servant mpk
         auto mpk = make_shared<MPK_I>();
         adapter->add(mpk, Ice::stringToIdentity("mpk"));
 
-        //Wczytuje zajezdnie
-//        ifstream depos_file("depos.txt");
-//        if (!depos_file.is_open()) {
-//            cerr << "Nie można otworzyć pliku." << endl;
-//            throw "File error";
-//        }
 
-        //string depo_name;
 
-        //while (depos_file >> depo_name) {
         auto depo = make_shared<DepoI>("Zajezdnia1");
         auto depoPrx = Ice::uncheckedCast<DepoPrx>(adapter->addWithUUID(depo));
         mpk->registerDepo(depoPrx, Ice::Current());
-        //}
+
 
         auto lineFactory = make_shared<LineFactoryI>(adapter);
         auto lineFactoryPrx = Ice::uncheckedCast<LineFactoryPrx>(adapter->addWithUUID(lineFactory));
@@ -160,21 +152,6 @@ int main(int argc, char *argv[]) {
             auto tramStopPrx = stopFactory->createStop(stop_name, Ice::Current());
             mpk->addStop(tramStopPrx);
         }
-//
-//        ifstream stops_file2("stops2.txt");
-//
-//        if (!stops_file2.is_open()) {
-//            cerr << "Nie można otworzyć pliku." << endl;
-//            throw "File error";
-//        }
-//
-//        while (stops_file2 >> stop_name) {
-//            if(!mpk->getTramStop(stop_name)){
-//                auto tramStopPrx = stopFactory->createStop(stop_name, Ice::Current());
-//                mpk->addStop(tramStopPrx);
-//            }
-//        }
-
         ifstream lines_file("lines.txt");
         if (!lines_file.is_open()) {
             cerr << "Nie można otworzyć pliku." << endl;
@@ -307,7 +284,7 @@ int main(int argc, char *argv[]) {
                     cout << "Nieznana komenda." << endl;
                 }
             }
-            sleep(1);
+
         }
         //zawieszam watek az do przerwania
         ic->waitForShutdown();
