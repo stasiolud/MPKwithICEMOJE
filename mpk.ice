@@ -45,6 +45,7 @@ module SIP {
      void UpdateTramInfo(Tram* tram, Time time);
      void addCurrentTram(Tram* tram);
      void removeCurrentTram(Tram* tram);
+     void removeComingTram(Tram* tram);
   };
 
   interface Line
@@ -102,6 +103,7 @@ module SIP {
     string getStockNumber();
     TramStatus getStatus();
     void setStatus(TramStatus status);
+
   };
 
   interface Passenger{

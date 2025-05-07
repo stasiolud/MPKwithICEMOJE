@@ -35,4 +35,7 @@ public:
     void addCurrentTram(shared_ptr <TramPrx> tram, const Ice::Current &current) override;
 
     void removeCurrentTram(shared_ptr <TramPrx> tram, const Ice::Current &current) override;
+
+    void removeComingTram(shared_ptr <TramPrx> tram, const Ice::Current &current) override;
+
 };

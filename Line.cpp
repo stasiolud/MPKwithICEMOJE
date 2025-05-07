@@ -32,6 +32,14 @@ void LineI::unregisterTram(shared_ptr <TramPrx> tram, const Ice::Current &curren
             break;
         }
     }
+    for (const auto &stopInfo: all_stops) {
+        try {
+            stopInfo.stop->removeComingTram(tram, Ice::Context());
+        } catch (const Ice::Exception &e) {
+            cerr << "Błąd podczas usuwania tramwaju z przystanku: " << stopInfo.stop->getName()
+                 << " -> " << e.what() << endl;
+        }
+    }
 }
 
 void LineI::setStops(StopList sl, const Ice::Current &current) {

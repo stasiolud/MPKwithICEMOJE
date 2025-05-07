@@ -84,3 +84,13 @@ void TramStopI::removeCurrentTram(shared_ptr <TramPrx> tram, const Ice::Current 
         }
     }
 }
+
+void TramStopI::removeComingTram(shared_ptr <TramPrx> tram, const Ice::Current &current) {
+    for (auto it = coming_trams.begin(); it != coming_trams.end(); ++it) {
+        if (it->tram->ice_getIdentity() == tram->ice_getIdentity()) {
+            coming_trams.erase(it);
+            cout << "Tramwaj " << tram->getStockNumber() << " usunięty z coming_trams na przystanku: " << name << endl;
+            break;
+        }
+    }
+}
